@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SAG FORGE — Admin</title>
+<meta name="robots" content="noindex, nofollow">
+
+<!--
+  =====================================================================
+  THIS IS YOUR PRIVATE PAGE. Buyers should never see this URL.
+
+  - Do NOT link to this page anywhere on the public site.
+  - It is only "hidden" because nobody knows the link — protect it
+    further by requiring login below (Firebase Auth).
+  - Fill in FIREBASE_CONFIG and IMGBB_API_KEY below before use.
+  - See the setup comment at the top of index.html for full
+    step-by-step instructions (Firebase project, Firestore rules,
+    creating your admin login, getting an imgbb key).
+  =====================================================================
+-->
+
+<style>
+  :root{
+    --black:#0a0908; --charcoal:#161412; --charcoal-2:#201d19;
+    --gold:#c9a24b; --gold-bright:#e8c874; --ember:#a8431f;
+    --ivory:#ece5d6; --ivory-dim:#a39c8c; --line:rgba(201,162,75,0.18);
+  }
+  *{ box-sizing:border-box; margin:0; padding:0; }
+  body{
+    background:var(--black); color:var(--ivory);
+    font-family:'Inter', sans-serif;
+    min-height:100vh;
+    display:flex; align-items:center; justify-content:center;
+    padding:2rem;
+  }
+  a{ color:inherit; }
+  h1{
+    font-family:'Fraunces', serif; font-weight:600;
+    font-size:1.6rem; margin-bottom:0.4rem;
+  }
+  .eyebrow{
+    font-family:'Space Grotesk', monospace; font-size:0.7rem;
+    letter-spacing:0.24em; text-transform:uppercase; color:var(--gold);
+    margin-bottom:0.6rem;
+  }
+  .panel{
+    width:100%; max-width:420px;
+    background:var(--charcoal); border:1px solid var(--line);
+    padding:2.4rem; border-radius:4px;
+  }
+  .wide{ max-width:900px; }
+  .field{ display:flex; flex-direction:column; gap:0.4rem; margin-bottom:1rem; }
+  .field label{
+    font-family:'Space Grotesk', monospace; font-size:0.68rem;
+    letter-spacing:0.1em; text-transform:uppercase; color:var(--ivory-dim);
+  }
+  input, textarea{
+    background:var(--black); border:1px solid var(--line); color:var(--ivory);
+    padding:0.8rem 1rem; font-family:'Inter', sans-serif; font-size:0.95rem;
+    border-radius:2px; outline:none; width:100%;
+  }
+  input:focus, textarea:focus{ border-color:var(--gold); }
+  .btn{
+    font-family:'Space Grotesk', monospace; font-size:0.78rem;
+    letter-spacing:0.1em; text-transform:uppercase;
+    padding:0.85rem 1.6rem; border-radius:2px; cursor:pointer;
+    border:1px solid var(--gold); background:var(--gold); color:var(--black);
+    font-weight:600; width:100%;
+  }
+  .btn:hover{ background:var(--gold-bright); }
+  .btn-danger{ background:transparent; border-color:#7a3323; color:#c05a3a; width:auto; padding:0.5rem 0.9rem; font-size:0.68rem; }
+  .btn-danger:hover{ background:#7a3323; color:var(--ivory); }
+  #msg{ font-size:0.85rem; margin-top:0.8rem; min-height:1.2em; }
+  #msg.ok{ color:var(--gold-bright); } #msg.err{ color:#c05a3a; }
+
+  #adminScreen{ display:none; width:100%; max-width:900px; }
+  .product-list{ margin-top:2.5rem; display:flex; flex-direction:column; gap:0.8rem; }
+  .prow{
+    display:flex; align-items:center; gap:1rem; padding:0.8rem;
+    border:1px solid var(--line); border-radius:2px;
+  }
+  .prow img{ width:52px; height:52px; object-fit:cover; border-radius:2px; background:var(--charcoal-2); }
+  .prow .ph{ width:52px; height:52px; border-radius:2px; background:var(--charcoal-2); display:flex; align-items:center; justify-content:center; font-size:0.65rem; color:var(--ivory-dim); }
+  .prow .info{ flex:1; }
+  .prow .info .n{ font-weight:600; }
+  .prow .info .p{ color:var(--gold-bright); font-family:'Space Grotesk', monospace; font-size:0.85rem; }
+  .top-bar{ display:flex; justify-content:space-between; align-items:center; margin-bottom:2rem; }
+  .signout{ font-family:'Space Grotesk', monospace; font-size:0.72rem; color:var(--ivory-dim); cursor:pointer; letter-spacing:0.08em; }
+  .signout:hover{ color:var(--gold-bright); }
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+  @media (max-width:560px){ .grid2{ grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+
+<div class="panel" id="loginScreen">
+  <div class="eyebrow">Private</div>
+  <h1>Admin Login</h1>
+  <p style="color:var(--ivory-dim); font-size:0.85rem; margin-bottom:1.6rem;">SAG FORGE product manager</p>
+  <form id="loginForm">
+    <div class="field"><label>Email</label><input type="email" id="loginEmail" required></div>
+    <div class="field"><label>Password</label><input type="password" id="loginPassword" required></div>
+    <button class="btn" type="submit">Log In</button>
+    <div id="msg"></div>
+  </form>
+</div>
+
+<div class="panel wide" id="adminScreen">
+  <div class="top-bar">
+    <div>
+      <div class="eyebrow">Admin</div>
+      <h1>Manage Products</h1>
+    </div>
+    <div class="signout" id="signOutBtn">Sign out →</div>
+  </div>
+
+  <form id="productForm">
+    <input type="hidden" id="editId">
+    <div class="grid2">
+      <div class="field"><label>Product name</label><input type="text" id="pName" required></div>
+      <div class="field"><label>Price (type it however you want — e.g. ₦45,000 or $120)</label><input type="text" id="pPrice" required placeholder="e.g. ₦45,000"></div>
+    </div>
+    <div class="field"><label>Description</label><textarea id="pDesc" rows="2" required></textarea></div>
+    <div class="field"><label>Photo (optional — leave blank to keep current)</label><input type="file" id="pImage" accept="image/*"></div>
+    <button class="btn" type="submit" id="saveBtn">Add Product</button>
+    <button class="btn" type="button" id="cancelEdit" style="display:none; background:transparent; color:var(--ivory-dim); border-color:var(--line); margin-top:0.6rem;">Cancel Edit</button>
+    <div id="formMsg"></div>
+  </form>
+
+  <div class="product-list" id="productList"></div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500&display=swap" rel="stylesheet">
+
+<script>
+  /* ============ FIREBASE CONFIG — must match index.html ============ */
+  const FIREBASE_CONFIG = {
+    apiKey: "AIzaSyBBUBgDeyo1woJZBYSkkRehfVUXSCEyiOM",
+    authDomain: "sag-forge.firebaseapp.com",
+    projectId: "sag-forge",
+    storageBucket: "sag-forge.firebasestorage.app",
+    messagingSenderId: "54848231484",
+    appId: "1:54848231484:web:35c6bdbfb741ed81298b39"
+  };
+
+  /* ============ IMGBB API KEY — get one free at api.imgbb.com ======= */
+  const IMGBB_API_KEY = "446ed083c5188df07c21ec42590a079e";
+
+  firebase.initializeApp(FIREBASE_CONFIG);
+  const auth = firebase.auth();
+  const db = firebase.firestore();
+
+  const loginScreen = document.getElementById('loginScreen');
+  const adminScreen = document.getElementById('adminScreen');
+  const msg = document.getElementById('msg');
+
+  auth.onAuthStateChanged(user => {
+    if (user) {
+      loginScreen.style.display = 'none';
+      adminScreen.style.display = 'block';
+      loadProducts();
+    } else {
+      loginScreen.style.display = 'block';
+      adminScreen.style.display = 'none';
+    }
+  });
+
+  document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    msg.className = ''; msg.textContent = 'Signing in...';
+    try {
+      await auth.signInWithEmailAndPassword(email, password);
+    } catch (err) {
+      msg.className = 'err';
+      msg.textContent = 'Login failed — check your email/password (create a user in Firebase Console > Authentication).';
+    }
+  });
+
+  document.getElementById('signOutBtn').addEventListener('click', () => auth.signOut());
+
+  const productForm = document.getElementById('productForm');
+  const formMsg = document.getElementById('formMsg');
+  const saveBtn = document.getElementById('saveBtn');
+  const cancelEditBtn = document.getElementById('cancelEdit');
+
+  async function uploadImage(file) {
+    if (IMGBB_API_KEY === 'REPLACE_ME') {
+      throw new Error('imgbb API key not set yet — add it to IMGBB_API_KEY in this file.');
+    }
+    const fd = new FormData();
+    fd.append('image', file);
+    const res = await fetch(`https://api.imgbb.com/1/upload?key=${IMGBB_API_KEY}`, {
+      method: 'POST', body: fd
+    });
+    const data = await res.json();
+    if (!data.success) throw new Error('Image upload failed.');
+    return data.data.url;
+  }
+
+  productForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const editId = document.getElementById('editId').value;
+    const name = document.getElementById('pName').value.trim();
+    const price = document.getElementById('pPrice').value.trim();
+    const desc = document.getElementById('pDesc').value.trim();
+    const file = document.getElementById('pImage').files[0];
+
+    formMsg.className = ''; formMsg.textContent = 'Saving...';
+    saveBtn.disabled = true;
+
+    try {
+      let imageUrl = null;
+      if (file) imageUrl = await uploadImage(file);
+
+      if (editId) {
+        const updateData = { name, price, desc };
+        if (imageUrl) updateData.imageUrl = imageUrl;
+        await db.collection('products').doc(editId).update(updateData);
+        formMsg.textContent = 'Product updated.';
+      } else {
+        await db.collection('products').add({
+          name, price, desc, imageUrl: imageUrl || null,
+          createdAt: new Date().toISOString()
+        });
+        formMsg.textContent = 'Product added.';
+      }
+      formMsg.className = 'ok';
+      resetForm();
+    } catch (err) {
+      console.error(err);
+      formMsg.className = 'err';
+      formMsg.textContent = err.message || 'Something went wrong.';
+    }
+    saveBtn.disabled = false;
+  });
+
+  function resetForm() {
+    productForm.reset();
+    document.getElementById('editId').value = '';
+    saveBtn.textContent = 'Add Product';
+    cancelEditBtn.style.display = 'none';
+  }
+  cancelEditBtn.addEventListener('click', resetForm);
+
+  function loadProducts() {
+    db.collection('products').orderBy('createdAt', 'desc').onSnapshot(snap => {
+      const list = document.getElementById('productList');
+      list.innerHTML = '';
+      snap.forEach(doc => {
+        const p = doc.data();
+        const row = document.createElement('div');
+        row.className = 'prow';
+        row.innerHTML = `
+          ${p.imageUrl ? `<img src="${p.imageUrl}">` : `<div class="ph">No photo</div>`}
+          <div class="info">
+            <div class="n">${p.name}</div>
+            <div class="p">${p.price}</div>
+          </div>
+          <button class="btn" style="width:auto; background:transparent; color:var(--ivory-dim); border-color:var(--line); padding:0.5rem 0.9rem; font-size:0.68rem;" data-edit="${doc.id}">Edit</button>
+          <button class="btn-danger" data-delete="${doc.id}">Delete</button>
+        `;
+        list.appendChild(row);
+
+        row.querySelector('[data-edit]').addEventListener('click', () => {
+          document.getElementById('editId').value = doc.id;
+          document.getElementById('pName').value = p.name;
+          document.getElementById('pPrice').value = p.price;
+          document.getElementById('pDesc').value = p.desc;
+          saveBtn.textContent = 'Save Changes';
+          cancelEditBtn.style.display = 'block';
+          window.scrollTo({ top:0, behavior:'smooth' });
+        });
+        row.querySelector('[data-delete]').addEventListener('click', async () => {
+          if (!confirm(`Delete "${p.name}"? This can't be undone.`)) return;
+          await db.collection('products').doc(doc.id).delete();
+        });
+      });
+    });
+  }
+</script>
+
+</body>
+</html>
